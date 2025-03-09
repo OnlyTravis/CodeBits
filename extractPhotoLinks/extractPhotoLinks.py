@@ -4,6 +4,8 @@ import requests
 from html.parser import HTMLParser
 
 MAX_RETRY = 2
+PAUSE = 1
+PAUSE_FAIL = 2
 
 class imgSrcExtractor(HTMLParser):
 	srcList: list[str] = []
@@ -25,30 +27,42 @@ def check_response(response: requests.Response) -> bool:
 
 	return True
 
-def download_file(img_link: str, file_path: str) -> None:
+def download_file(img_link: str, file_path: str) -> bool:
+	"""
+	return True : Downloaded successfully
+	return False : Download failed
+	"""
 	retry = True
 	retry_count = 0
 	while retry:
 		retry = False
-		img_res = requests.get(img_link)
+		try:
+			img_res = requests.get(img_link)
+		except:
+			print(f"An exception occured when fetching the image(Retry {retry_count})")
+			retry = True
+			retry_count += 1
+			sleep(PAUSE_FAIL)
+			return
 
 		if not check_response(img_res):
 			retry = True
 			retry_count += 1
 
-			if retry_count > MAX_RETRY:
-				print(f"Maximum retry reached! Skipping {file_path}...")
-				sleep(5)
-				return
+			if retry_count >= MAX_RETRY:
+				print(f"File {file_path} download unsuccessful(Retry {retry_count})... Skipping.")
+				sleep(PAUSE_FAIL)
+				return False
 
 			print(f"File {file_path} download unsuccessful(Retry {retry_count})... Retrying in 5 seconds.")
-			sleep(5)
+			sleep(PAUSE_FAIL)
 			continue
 
 		with open(file_path, "wb") as file:
 			file.write(img_res.content)
 			print(f"File {file_path} download successful!")
-			sleep(1)
+			sleep(PAUSE)
+			return True
 
 def main_procedures() -> None:
 	# 1. Input
@@ -70,6 +84,7 @@ def main_procedures() -> None:
 	img_links = parser.extract_from_link(res.text)
 
 	# 4. Prepare output directory
+	os.makedirs("./outputs", exist_ok=True)
 	outputDirs = os.listdir("./outputs")
 	output_num = 1
 	while (f"output{output_num}" in outputDirs):
@@ -78,8 +93,14 @@ def main_procedures() -> None:
 	os.makedirs(output_dir)
 
 	# 5. Downlaod each image
+	failed_list: list[str] = []
 	for i, img_link in enumerate(img_links):
-		download_file(img_link, f"{output_dir}/{img_name}_{i+1:0>3d}.jpeg")
+		if (not download_file(img_link, f"{output_dir}/{img_name}_{i+1:0>3d}.jpeg")):
+			failed_list.append(img_link)
+
+	if (len(failed_list) != 0):
+		with open(f"{output_dir}/failed_list.txt", "w") as file:
+			file.write(failed_list.join("\n"))
 
 def main() -> None:
 	loop = True
