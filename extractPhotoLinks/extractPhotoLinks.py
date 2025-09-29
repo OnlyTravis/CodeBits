@@ -4,7 +4,7 @@ import requests
 from html.parser import HTMLParser
 
 MAX_RETRY = 2
-PAUSE = 1
+PAUSE = 0
 PAUSE_FAIL = 2
 
 class imgSrcExtractor(HTMLParser):
@@ -84,23 +84,27 @@ def main_procedures() -> None:
 	img_links = parser.extract_from_link(res.text)
 
 	# 4. Prepare output directory
+	'''
 	os.makedirs("./outputs", exist_ok=True)
 	outputDirs = os.listdir("./outputs")
 	output_num = 1
 	while (f"output{output_num}" in outputDirs):
 		output_num += 1
 	output_dir = f"./outputs/output{output_num}"
+	os.makedirs(output_dir)'''
+	
+	output_dir = f"./outputs/{img_name}"
 	os.makedirs(output_dir)
 
 	# 5. Downlaod each image
 	failed_list: list[str] = []
 	for i, img_link in enumerate(img_links):
 		if (not download_file(img_link, f"{output_dir}/{img_name}_{i+1:0>3d}.jpeg")):
-			failed_list.append(img_link)
+			failed_list.append(f"{output_dir}/{img_name}_{i+1:0>3d}.jpeg")
 
 	if (len(failed_list) != 0):
 		with open(f"{output_dir}/failed_list.txt", "w") as file:
-			file.write(failed_list.join("\n"))
+			file.write("\n".join(failed_list))
 
 def main() -> None:
 	loop = True
